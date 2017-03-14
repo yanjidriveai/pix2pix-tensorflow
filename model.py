@@ -107,7 +107,7 @@ class pix2pix(object):
 
     def load_random_samples(self):
         data = np.random.choice(glob('%s/val/*' % self.args.data_dir), self.args.batch_size)
-        sample = [load_data(sample_file) for sample_file in data]
+        sample = [load_data(sample_file, self.args) for sample_file in data]
 
         if (self.is_grayscale):
             sample_images = np.array(sample).astype(np.float32)[:, :, :, None]
@@ -155,7 +155,7 @@ class pix2pix(object):
             print(batch_idxs)
             for idx in xrange(0, batch_idxs):
                 batch_files = data[idx*self.batch_size:(idx+1)*self.batch_size]
-                batch = [load_data(batch_file) for batch_file in batch_files]
+                batch = [load_data(batch_file, self.args) for batch_file in batch_files]
                 if (self.is_grayscale):
                     batch_images = np.array(batch).astype(np.float32)[:, :, :, None]
                 else:
@@ -339,7 +339,7 @@ class pix2pix(object):
 
         # load testing input
         print("Loading testing images ...")
-        sample = [load_data(sample_file, is_test=True) for sample_file in sample_files]
+        sample = [load_data(sample_file, self.args, is_test=True) for sample_file in sample_files]
 
         if (self.is_grayscale):
             sample_images = np.array(sample).astype(np.float32)[:, :, :, None]
