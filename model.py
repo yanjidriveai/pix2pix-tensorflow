@@ -70,24 +70,23 @@ class pix2pix(object):
 
         self.real_AB = tf.concat(3, [self.real_A, self.real_B])
         self.fake_AB = tf.concat(3, [self.real_A, self.fake_B])
-        print(self.real_A.get_shape())
-        print(self.real_B.get_shape())
-        print(self.fake_B.get_shape())
-        print(self.fake_AB.get_shape())
-        self.D, self.D_logits = self.discriminator(self.real_AB, reuse=False)
-        self.D_, self.D_logits_ = self.discriminator(self.fake_AB, reuse=True)
+        self.pos_logit, self.pos_vec = self.discriminator(self.real_AB, reuse=False)
+        self.neg_logit, self.neg_vec = self.discriminator(self.fake_AB, reuse=True)
 
         self.fake_B_sample = self.sampler(self.real_A)
 
-        self.d_sum = tf.histogram_summary("d", self.D)
-        self.d__sum = tf.histogram_summary("d_", self.D_)
         self.fake_B_sum = tf.image_summary("fake_B", self.fake_B)
         self.real_B_sum = tf.image_summary("real_B", self.real_B)
 
-        self.d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
-        self.d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
-        self.g_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_))) \
-                        + self.args.L1_lambda * tf.reduce_mean(tf.abs(self.real_B - self.fake_B))
+        self.d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(self.pos_vec, tf.ones_like(self.pos_logit)))
+        self.d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(self.neg_vec, tf.zeros_like(self.neg_logit)))
+
+        self.g_loss = 0
+
+        if self.args.use_gan:
+            self.g_loss += tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(self.neg_vec, tf.ones_like(self.neg_logit)))
+        if self.args.use_L1:
+            self.g_loss += self.args.L1_lambda * tf.reduce_mean(tf.abs(self.real_B - self.fake_B))
 
         self.d_loss_real_sum = tf.scalar_summary("d_loss_real", self.d_loss_real)
         self.d_loss_fake_sum = tf.scalar_summary("d_loss_fake", self.d_loss_fake)
@@ -134,9 +133,12 @@ class pix2pix(object):
                           .minimize(self.g_loss, var_list=self.g_vars)
         tf.initialize_all_variables().run()
 
-        self.g_sum = tf.merge_summary([self.d__sum,
-            self.fake_B_sum, self.real_B_sum, self.d_loss_fake_sum, self.g_loss_sum])
-        self.d_sum = tf.merge_summary([self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
+        self.g_sum = tf.merge_summary([self.fake_B_sum,
+                                       self.real_B_sum,
+                                       self.d_loss_fake_sum,
+                                       self.g_loss_sum])
+        self.d_sum = tf.merge_summary([self.d_loss_real_sum,
+                                       self.d_loss_sum])
         self.writer = tf.train.SummaryWriter("./logs", self.sess.graph)
 
         counter = 1
@@ -162,29 +164,27 @@ class pix2pix(object):
                     batch_images = np.array(batch).astype(np.float32)
 
                 batch_images = batch_images[:,:,:,:4]
-                # Update D network
-                _, summary_str = self.sess.run([d_optim, self.d_sum],
-                                               feed_dict={ self.real_data: batch_images })
-                self.writer.add_summary(summary_str, counter)
 
-                # Update G network
+                # Update D network only if gan is used
+                if self.args.use_gan:
+                    _, summary_str = self.sess.run([d_optim, self.d_sum],
+                                                   feed_dict={ self.real_data: batch_images })
+                    self.writer.add_summary(summary_str, counter)
+                    # Update G network
+                    _, summary_str = self.sess.run([g_optim, self.g_sum],
+                                                   feed_dict={ self.real_data: batch_images })
+                    self.writer.add_summary(summary_str, counter)
+
                 _, summary_str = self.sess.run([g_optim, self.g_sum],
                                                feed_dict={ self.real_data: batch_images })
                 self.writer.add_summary(summary_str, counter)
 
-                # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-                _, summary_str = self.sess.run([g_optim, self.g_sum],
-                                               feed_dict={ self.real_data: batch_images })
-                self.writer.add_summary(summary_str, counter)
-
-                errD_fake = self.d_loss_fake.eval({self.real_data: batch_images})
-                errD_real = self.d_loss_real.eval({self.real_data: batch_images})
                 errG = self.g_loss.eval({self.real_data: batch_images})
 
                 counter += 1
-                print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
+                print("Epoch: [%2d] [%4d/%4d] time: %4.4f, g_loss: %.8f" \
                     % (epoch, idx, batch_idxs,
-                        time.time() - start_time, errD_fake+errD_real, errG))
+                        time.time() - start_time, errG))
 
                 if np.mod(counter, 100) == 1:
                     self.sample_model(self.args.sample_dir, epoch, idx)

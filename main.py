@@ -17,6 +17,9 @@ parser.add_argument('--checkpoint_dir', dest='checkpoint_dir', default='./checkp
 parser.add_argument('--sample_dir', dest='sample_dir', default='./sample', help='sample are saved here')
 parser.add_argument('--test_dir', dest='test_dir', default='./test', help='test sample are saved here')
 parser.add_argument('--L1_lambda', dest='L1_lambda', type=float, default=100.0, help='weight on L1 term in objective')
+parser.add_argument('--use_gan', help='keep the gan loss term', default=True, action='store_true')
+parser.add_argument('--use_L1', help='keep the l1 loss term', default=True, action='store_true')
+parser.add_argument('--use_wgan', help='use wgan for gan loss term', default=False, action='store_true')
 
 args = parser.parse_args()
 
