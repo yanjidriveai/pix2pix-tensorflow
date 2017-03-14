@@ -7,6 +7,7 @@ import numpy as np
 from six.moves import xrange
 from ops import *
 from utils import *
+import math
 
 class pix2pix(object):
     def __init__(self, sess, args):
@@ -45,8 +46,6 @@ class pix2pix(object):
         self.g_bn_e9 = batch_norm(name='g_bn_e9')
         self.g_bn_e10 = batch_norm(name='g_bn_e10')
 
-        self.g_bn_d9 = batch_norm(name='g_bn_d9')
-        self.g_bn_d8 = batch_norm(name='g_bn_d8')
         self.g_bn_d1 = batch_norm(name='g_bn_d1')
         self.g_bn_d2 = batch_norm(name='g_bn_d2')
         self.g_bn_d3 = batch_norm(name='g_bn_d3')
@@ -54,6 +53,8 @@ class pix2pix(object):
         self.g_bn_d5 = batch_norm(name='g_bn_d5')
         self.g_bn_d6 = batch_norm(name='g_bn_d6')
         self.g_bn_d7 = batch_norm(name='g_bn_d7')
+        self.g_bn_d8 = batch_norm(name='g_bn_d8')
+        self.g_bn_d9 = batch_norm(name='g_bn_d9')
 
         self.build_model()
 
@@ -235,21 +236,19 @@ class pix2pix(object):
         e8 = self.g_bn_e8(conv2d(lrelu(e7), initial_conv_channels*8, name='g_e8_conv'))
         # e8 is (1 x 1 x self.gf_dim*8)
 
-        # added conv layers
-        e9 = self.g_bn_e9(conv2d(lrelu(e8), initial_conv_channels*8, name='g_e9_conv'))
-        e10 = self.g_bn_e10(conv2d(lrelu(e9), initial_conv_channels*8, name='g_e10_conv'))
-
-        # added deconv layers
-        self.d10, self.d10_w, self.d10_b = deconv2d(tf.nn.relu(e10),
-            [self.batch_size, s512, s512, initial_conv_channels*8], name='g_d10', with_w=True)
-        d10 = tf.nn.dropout(self.g_bn_d9(self.d10), 0.5)
-        d10 = tf.concat(3, [d10, e9])
-
-        self.d9, self.d9_w, self.d9_b = deconv2d(tf.nn.relu(d10),
-            [self.batch_size, s256, s256, initial_conv_channels*8], name='g_d9', with_w=True)
-        d9 = tf.nn.dropout(self.g_bn_d8(self.d9), 0.5)
-        d9 = tf.concat(3, [d9, e8])
-
+        if s == 1024:
+            # add additional conv layers
+            e9 = self.g_bn_e9(conv2d(lrelu(e8), initial_conv_channels*8, name='g_e9_conv'))
+            e10 = self.g_bn_e10(conv2d(lrelu(e9), initial_conv_channels*8, name='g_e10_conv'))
+            # add additional deconv layers
+            self.d10, self.d10_w, self.d10_b = deconv2d(tf.nn.relu(e10),
+                [self.batch_size, s512, s512, initial_conv_channels*8], name='g_d10', with_w=True)
+            d10 = tf.nn.dropout(self.g_bn_d9(self.d10), 0.5)
+            d10 = tf.concat(3, [d10, e9])
+            self.d9, self.d9_w, self.d9_b = deconv2d(tf.nn.relu(d10),
+                [self.batch_size, s256, s256, initial_conv_channels*8], name='g_d9', with_w=True)
+            d9 = tf.nn.dropout(self.g_bn_d8(self.d9), 0.5)
+            d9 = tf.concat(3, [d9, e8])
 
         self.d1, self.d1_w, self.d1_b = deconv2d(tf.nn.relu(d9),
             [self.batch_size, s128, s128, initial_conv_channels*8], name='g_d1', with_w=True)
