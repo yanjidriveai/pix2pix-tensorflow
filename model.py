@@ -277,7 +277,7 @@ class pix2pix(object):
         # d4 is (16 x 16 x self.gf_dim*8*2)
 
         self.d5, self.d5_w, self.d5_b = deconv2d(tf.nn.relu(d4),
-            [self.batch_size, s8, s8, initial_conv_channelsngf*4], name='g_d5', with_w=True)
+            [self.batch_size, s8, s8, initial_conv_channels*4], name='g_d5', with_w=True)
         d5 = self.g_bn_d5(self.d5)
         d5 = tf.concat(3, [d5, e3])
         # d5 is (32 x 32 x self.gf_dim*4*2)
